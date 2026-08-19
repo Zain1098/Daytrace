@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:daytrace/core/database/app_database.dart';
 import 'package:daytrace/core/notifications/notification_service.dart';
+import 'package:daytrace/core/platform/widget_launch_service.dart';
 import 'package:daytrace/core/voice/voice_capture_service.dart';
 import 'package:daytrace/features/reminders/application/smart_prompt_policy.dart';
 import 'package:daytrace/features/settings/data/settings_repository.dart';
@@ -34,6 +35,10 @@ class SmartPromptOpenNotifier extends Notifier<int> {
 
   void request() => state++;
 }
+
+final StreamProvider<int> widgetQuickAddProvider = StreamProvider<int>(
+  (Ref ref) => widgetLaunchService.quickAddRequests,
+);
 
 class TodayController extends AsyncNotifier<TodayData> {
   @override

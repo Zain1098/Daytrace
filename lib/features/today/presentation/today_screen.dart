@@ -22,6 +22,16 @@ class TodayScreen extends ConsumerWidget {
       },
       fireImmediately: true,
     );
+    ref.listen<AsyncValue<int>>(widgetQuickAddProvider, (
+      AsyncValue<int>? previous,
+      AsyncValue<int> next,
+    ) {
+      if (next.value != null && next.value != previous?.value) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) _showQuickAdd(context, ref, startNow: true);
+        });
+      }
+    });
     final DateTime now = DateTime.now();
     final ColorScheme colors = Theme.of(context).colorScheme;
     final AsyncValue<TodayData> today = ref.watch(todayControllerProvider);
