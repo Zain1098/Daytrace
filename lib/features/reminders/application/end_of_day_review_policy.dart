@@ -9,7 +9,7 @@ class EndOfDayReviewPolicy {
     required TrackingSettings settings,
   }) {
     final DateTime localNow = now.toLocal();
-    if (!settings.workingDays.contains(localNow.weekday)) return null;
+    if (!settings.isWorkingDay(localNow)) return null;
     final DateTime reviewAt = DateTime(
       localNow.year,
       localNow.month,

@@ -106,6 +106,8 @@ class TrackingSettings {
   final int? quietStartHour;
   final int? quietEndHour;
 
+  bool isWorkingDay(DateTime date) => workingDays.contains(date.weekday);
+
   Map<String, dynamic> toJson() => <String, dynamic>{
         'startHour': startHour,
         'endHour': endHour,

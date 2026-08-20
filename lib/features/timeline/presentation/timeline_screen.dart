@@ -304,6 +304,11 @@ class TimelineScreen extends ConsumerWidget {
   String _dateTimeLabel(BuildContext context, DateTime value) => '${value.day}/${value.month}/${value.year} ${TimeOfDay.fromDateTime(value).format(context)}';
 
   List<_TimelineRow> _timelineRows(DateTime day, List<TimelineItem> entries, TrackingSettings tracking) {
+    if (!tracking.isWorkingDay(day)) {
+      return entries
+          .map<_TimelineRow>((TimelineItem entry) => _TimelineRow.entry(entry))
+          .toList(growable: false);
+    }
     final DateTime workStart = DateTime(day.year, day.month, day.day, tracking.startHour).toUtc();
     final DateTime workEnd = DateTime(day.year, day.month, day.day, tracking.endHour).toUtc();
     DateTime cursor = workStart;

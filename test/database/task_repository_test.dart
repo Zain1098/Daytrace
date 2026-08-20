@@ -126,6 +126,16 @@ void main() {
     );
   });
 
+  test('working-day preferences classify weekdays consistently', () {
+    const TrackingSettings settings = TrackingSettings(
+      workingDays: <int>[DateTime.monday, DateTime.wednesday],
+    );
+
+    expect(settings.isWorkingDay(DateTime(2026, 8, 17)), isTrue); // Monday
+    expect(settings.isWorkingDay(DateTime(2026, 8, 18)), isFalse); // Tuesday
+    expect(settings.isWorkingDay(DateTime(2026, 8, 19)), isTrue); // Wednesday
+  });
+
   test('task persists the selected category', () async {
     await repository.createTask(
       title: 'Read chapter',
