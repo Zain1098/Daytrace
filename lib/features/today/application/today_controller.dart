@@ -226,6 +226,22 @@ class TodayController extends AsyncNotifier<TodayData> {
         }
         return;
       }
+      if (action.kind == NotificationActionKind.activeTimer) {
+        switch (action.actionId) {
+          case 'pause_active':
+            await repository.pauseActiveTask();
+            break;
+          case 'complete_active':
+            final List<int> notificationIds = await repository.completeActiveTask();
+            await _cancelPlatformNotifications(notificationIds);
+            await _restoreFutureReminders();
+            break;
+          default:
+            return;
+        }
+        await refresh();
+        return;
+      }
       if (action.kind == NotificationActionKind.smartPrompt) {
         switch (action.actionId) {
           case 'open':
@@ -339,6 +355,24 @@ class TodayController extends AsyncNotifier<TodayData> {
       // when notification permission or device scheduling is unavailable.
     }
     await _syncEndOfDayReview(settings);
+    await _syncActiveTimerNotification(today);
+  }
+
+  Future<void> _syncActiveTimerNotification(TodayData today) async {
+    final NotificationService notifications = ref.read(notificationServiceProvider);
+    try {
+      final ActiveActivity? active = today.active;
+      if (active == null) {
+        await notifications.cancelActiveTimer();
+      } else {
+        await notifications.showActiveTimer(
+          title: active.title,
+          startedAt: active.startedAt,
+        );
+      }
+    } catch (_) {
+      // The timer remains correct in local storage if Android blocks alerts.
+    }
   }
 
   Future<void> _syncEndOfDayReview(TrackingSettings settings) async {

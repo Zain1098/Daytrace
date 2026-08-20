@@ -9,6 +9,7 @@ final NotificationService dayTraceNotificationService = NotificationService();
 class NotificationService {
   static const int smartPromptNotificationId = 900002;
   static const int endOfDayReviewNotificationId = 900003;
+  static const int activeTimerNotificationId = 900004;
 
   NotificationService({FlutterLocalNotificationsPlugin? plugin})
       : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
@@ -49,6 +50,10 @@ class NotificationService {
     }
     if (payload == 'end_of_day_review') {
       _emitAction(NotificationAction.endOfDayReview(actionId: actionId));
+      return;
+    }
+    if (payload == 'active_timer') {
+      _emitAction(NotificationAction.activeTimer(actionId: actionId));
       return;
     }
     if (payload == null || !payload.startsWith('reminder:')) return;
@@ -202,6 +207,45 @@ class NotificationService {
 
   Future<void> cancelEndOfDayReview() => cancel(endOfDayReviewNotificationId);
 
+  Future<void> showActiveTimer({
+    required String title,
+    required DateTime startedAt,
+  }) async {
+    await initialize();
+    final DateTime localStart = startedAt.toLocal();
+    await _plugin.show(
+      id: activeTimerNotificationId,
+      title: 'Tracking: $title',
+      body: 'Started ${localStart.hour.toString().padLeft(2, '0')}:${localStart.minute.toString().padLeft(2, '0')}',
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'active_timer',
+          'Active timer',
+          channelDescription: 'Controls for the currently tracked DayTrace activity',
+          importance: Importance.low,
+          priority: Priority.low,
+          ongoing: true,
+          autoCancel: false,
+          actions: <AndroidNotificationAction>[
+            AndroidNotificationAction(
+              'pause_active',
+              'Pause',
+              showsUserInterface: true,
+            ),
+            AndroidNotificationAction(
+              'complete_active',
+              'Complete',
+              showsUserInterface: true,
+            ),
+          ],
+        ),
+      ),
+      payload: 'active_timer',
+    );
+  }
+
+  Future<void> cancelActiveTimer() => cancel(activeTimerNotificationId);
+
   Future<void> showUpdateAvailable({required String version}) async {
     await initialize();
     await _plugin.show(
@@ -216,7 +260,7 @@ class NotificationService {
   }
 }
 
-enum NotificationActionKind { reminder, smartPrompt, endOfDayReview }
+enum NotificationActionKind { reminder, smartPrompt, endOfDayReview, activeTimer }
 
 class NotificationAction {
   const NotificationAction.reminder({
@@ -232,6 +276,11 @@ class NotificationAction {
 
   const NotificationAction.endOfDayReview({required this.actionId})
     : kind = NotificationActionKind.endOfDayReview,
+      reminderId = null,
+      taskId = null;
+
+  const NotificationAction.activeTimer({required this.actionId})
+    : kind = NotificationActionKind.activeTimer,
       reminderId = null,
       taskId = null;
 
