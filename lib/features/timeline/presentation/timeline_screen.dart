@@ -11,6 +11,17 @@ class TimelineScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<int>(
+      smartPromptPastActivityRequestProvider,
+      (int? previous, int next) {
+        if (next <= 0 || next == previous) return;
+        ref.read(smartPromptPastActivityRequestProvider.notifier).consume();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) _showManualEntry(context, ref);
+        });
+      },
+      fireImmediately: true,
+    );
     final AsyncValue<List<TimelineItem>> items = ref.watch(timelineControllerProvider);
     final TrackingSettings tracking = ref.watch(trackingSettingsProvider).value ?? const TrackingSettings();
     final DateTime day = ref.watch(timelineDayProvider);
@@ -293,6 +304,11 @@ class TimelineScreen extends ConsumerWidget {
   String _dateTimeLabel(BuildContext context, DateTime value) => '${value.day}/${value.month}/${value.year} ${TimeOfDay.fromDateTime(value).format(context)}';
 
   List<_TimelineRow> _timelineRows(DateTime day, List<TimelineItem> entries, TrackingSettings tracking) {
+    if (!tracking.isWorkingDay(day)) {
+      return entries
+          .map<_TimelineRow>((TimelineItem entry) => _TimelineRow.entry(entry))
+          .toList(growable: false);
+    }
     final DateTime workStart = DateTime(day.year, day.month, day.day, tracking.startHour).toUtc();
     final DateTime workEnd = DateTime(day.year, day.month, day.day, tracking.endHour).toUtc();
     DateTime cursor = workStart;

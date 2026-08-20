@@ -18,6 +18,13 @@ class SettingsRepository {
       startHour: value['startHour'] as int? ?? 9,
       endHour: value['endHour'] as int? ?? 17,
       promptMinutes: value['promptMinutes'] as int? ?? 60,
+      workingDays: (value['workingDays'] as List<dynamic>?)
+              ?.whereType<int>()
+              .where((int day) => day >= DateTime.monday && day <= DateTime.sunday)
+              .toList(growable: false) ??
+          TrackingSettings.defaultWorkingDays,
+      quietStartHour: value['quietStartHour'] as int?,
+      quietEndHour: value['quietEndHour'] as int?,
     );
   }
 
@@ -55,12 +62,58 @@ class SettingsRepository {
       <Object?>[jsonEncode(value), DateTime.now().toUtc().millisecondsSinceEpoch],
     );
   }
+
+  Future<bool> isOnboardingComplete() async {
+    await _database.initialize();
+    final List<Map<String, Object?>> rows = await _database.select(
+      "SELECT value_json FROM app_settings WHERE key = 'onboarding_complete'",
+    );
+    if (rows.isEmpty) return false;
+    return jsonDecode(rows.single['value_json']! as String) as bool? ?? false;
+  }
+
+  Future<void> setOnboardingComplete(bool complete) async {
+    await _database.initialize();
+    await _database.insert(
+      "INSERT OR REPLACE INTO app_settings (key, value_json, updated_at) VALUES ('onboarding_complete', ?, ?)",
+      <Object?>[jsonEncode(complete), DateTime.now().toUtc().millisecondsSinceEpoch],
+    );
+  }
 }
 
 class TrackingSettings {
-  const TrackingSettings({this.startHour = 9, this.endHour = 17, this.promptMinutes = 60});
+  const TrackingSettings({
+    this.startHour = 9,
+    this.endHour = 17,
+    this.promptMinutes = 60,
+    this.workingDays = defaultWorkingDays,
+    this.quietStartHour,
+    this.quietEndHour,
+  });
+
+  static const List<int> defaultWorkingDays = <int>[
+    DateTime.monday,
+    DateTime.tuesday,
+    DateTime.wednesday,
+    DateTime.thursday,
+    DateTime.friday,
+  ];
+
   final int startHour;
   final int endHour;
   final int promptMinutes;
-  Map<String, dynamic> toJson() => <String, dynamic>{'startHour': startHour, 'endHour': endHour, 'promptMinutes': promptMinutes};
+  final List<int> workingDays;
+  final int? quietStartHour;
+  final int? quietEndHour;
+
+  bool isWorkingDay(DateTime date) => workingDays.contains(date.weekday);
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'startHour': startHour,
+        'endHour': endHour,
+        'promptMinutes': promptMinutes,
+        'workingDays': workingDays,
+        'quietStartHour': quietStartHour,
+        'quietEndHour': quietEndHour,
+      };
 }

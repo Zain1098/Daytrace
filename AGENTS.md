@@ -1,11 +1,11 @@
 # AGENTS.md - DayTrace AI Coding Contract
 
 Read these files before changing code:
-1. `docs/PRD.md`
-2. `docs/ARCHITECTURE.md`
-3. `docs/DATABASE_SCHEMA.sql`
-4. `docs/IMPLEMENTATION_PLAN.md`
-5. `docs/DECISIONS.md`
+1. `PRD.md`
+2. `ARCHITECTURE.md`
+3. `DATABASE_SCHEMA.sql`
+4. `IMPLEMENTATION_PLAN.md`
+5. `DECISIONS.md`
 
 ## Product Identity
 DayTrace is an Android-only, offline-first personal task planner, activity timer, timeline, reminder, and report generator. It is not an ERP, team tracker, attendance system, or generic social productivity platform.

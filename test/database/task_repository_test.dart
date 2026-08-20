@@ -101,6 +101,39 @@ void main() {
       ),
       isNull,
     );
+    const TrackingSettings quietSettings = TrackingSettings(
+      startHour: 9,
+      endHour: 23,
+      promptMinutes: 60,
+      quietStartHour: 22,
+      quietEndHour: 7,
+    );
+    expect(
+      policy.nextPromptAt(
+        now: DateTime(2026, 8, 19, 22),
+        settings: quietSettings,
+        activeActivity: null,
+      ),
+      isNull,
+    );
+    expect(
+      policy.nextPromptAt(
+        now: DateTime(2026, 8, 23, 10), // Sunday, not in default work days.
+        settings: settings,
+        activeActivity: null,
+      ),
+      isNull,
+    );
+  });
+
+  test('working-day preferences classify weekdays consistently', () {
+    const TrackingSettings settings = TrackingSettings(
+      workingDays: <int>[DateTime.monday, DateTime.wednesday],
+    );
+
+    expect(settings.isWorkingDay(DateTime(2026, 8, 17)), isTrue); // Monday
+    expect(settings.isWorkingDay(DateTime(2026, 8, 18)), isFalse); // Tuesday
+    expect(settings.isWorkingDay(DateTime(2026, 8, 19)), isTrue); // Wednesday
   });
 
   test('task persists the selected category', () async {
@@ -508,5 +541,51 @@ void main() {
     expect(daily.trackedMinutes, 90);
     expect(weekly.trackedMinutes, 210);
     expect(weekly.localSummary, contains('Tracked time: 3h 30m'));
+  });
+
+  test('onboarding completion is persisted locally', () async {
+    final SettingsRepository settings = SettingsRepository(database);
+
+    expect(await settings.isOnboardingComplete(), isFalse);
+    await settings.setOnboardingComplete(true);
+    expect(await settings.isOnboardingComplete(), isTrue);
+  });
+
+  test('onboarding tracking preferences use the existing local settings store', () async {
+    final SettingsRepository settings = SettingsRepository(database);
+
+    await settings.saveTracking(
+      const TrackingSettings(
+        startHour: 8,
+        endHour: 18,
+        promptMinutes: 45,
+        workingDays: <int>[DateTime.monday, DateTime.saturday],
+        quietStartHour: 22,
+        quietEndHour: 7,
+      ),
+    );
+    final TrackingSettings saved = await settings.loadTracking();
+
+    expect(saved.startHour, 8);
+    expect(saved.endHour, 18);
+    expect(saved.promptMinutes, 45);
+    expect(saved.workingDays, <int>[DateTime.monday, DateTime.saturday]);
+    expect(saved.quietStartHour, 22);
+    expect(saved.quietEndHour, 7);
+  });
+
+  test('clearing local data preserves the default categories and schema', () async {
+    await repository.createTask(title: 'Temporary task', startNow: false);
+    await database.clearAllUserData();
+
+    expect(await database.select('SELECT id FROM tasks'), isEmpty);
+    expect(
+      await database.select('SELECT id FROM categories ORDER BY sort_order'),
+      hasLength(6),
+    );
+    expect(
+      await database.select('SELECT version FROM schema_migrations ORDER BY version'),
+      hasLength(2),
+    );
   });
 }

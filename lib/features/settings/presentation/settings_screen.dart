@@ -1,5 +1,6 @@
 import 'package:daytrace/features/settings/data/settings_repository.dart';
 import 'package:daytrace/features/backup/data/backup_service.dart';
+import 'package:daytrace/features/onboarding/application/onboarding_controller.dart';
 import 'package:daytrace/features/updates/data/app_update_service.dart';
 import 'package:daytrace/features/today/application/today_controller.dart';
 import 'package:daytrace/features/ai_summary/data/ai_summary_service.dart';
@@ -27,7 +28,8 @@ class _TrackingSettingsForm extends ConsumerStatefulWidget {
   @override ConsumerState<_TrackingSettingsForm> createState() => _TrackingSettingsFormState();
 }
 class _TrackingSettingsFormState extends ConsumerState<_TrackingSettingsForm> {
-  late int start = widget.value.startHour; late int end = widget.value.endHour; late int prompt = widget.value.promptMinutes;
+  late int start = widget.value.startHour; late int end = widget.value.endHour; late int prompt = widget.value.promptMinutes; late final Set<int> workingDays = widget.value.workingDays.toSet();
+  late int quietStart = widget.value.quietStartHour ?? -1; late int quietEnd = widget.value.quietEndHour ?? -1;
   @override Widget build(BuildContext context) => ListView(padding: const EdgeInsets.all(20), children: <Widget>[
     Text('Appearance', style: Theme.of(context).textTheme.titleMedium),
     const SizedBox(height: 4),
@@ -39,13 +41,20 @@ class _TrackingSettingsFormState extends ConsumerState<_TrackingSettingsForm> {
     const Text('Timeline gaps and smart prompts only apply inside these hours.'),
     DropdownButtonFormField<int>(initialValue: start, decoration: const InputDecoration(labelText: 'Start'), items: List.generate(24, (int h) => DropdownMenuItem(value: h, child: Text('${h.toString().padLeft(2, '0')}:00'))), onChanged: (int? h) => setState(() => start = h!)),
     DropdownButtonFormField<int>(initialValue: end, decoration: const InputDecoration(labelText: 'End'), items: List.generate(24, (int h) => DropdownMenuItem(value: h, child: Text('${h.toString().padLeft(2, '0')}:00'))), onChanged: (int? h) => setState(() => end = h!)),
+    const SizedBox(height: 12), Text('Working days', style: Theme.of(context).textTheme.titleSmall),
+    Wrap(spacing: 6, children: <Widget>[for (final (int day, String label) in <(int, String)>[(DateTime.monday, 'M'), (DateTime.tuesday, 'T'), (DateTime.wednesday, 'W'), (DateTime.thursday, 'T'), (DateTime.friday, 'F'), (DateTime.saturday, 'S'), (DateTime.sunday, 'S')]) FilterChip(label: Text(label), selected: workingDays.contains(day), onSelected: (bool selected) => setState(() { if (selected) { workingDays.add(day); } else { workingDays.remove(day); } }))]),
     const SizedBox(height: 24), Text('Untracked-time prompt', style: Theme.of(context).textTheme.titleMedium),
     DropdownButtonFormField<int>(initialValue: prompt, decoration: const InputDecoration(labelText: 'Prompt interval'), items: const <DropdownMenuItem<int>>[DropdownMenuItem(value: 0, child: Text('Off')), DropdownMenuItem(value: 30, child: Text('30 minutes')), DropdownMenuItem(value: 45, child: Text('45 minutes')), DropdownMenuItem(value: 60, child: Text('60 minutes')), DropdownMenuItem(value: 90, child: Text('90 minutes')), DropdownMenuItem(value: 120, child: Text('120 minutes'))], onChanged: (int? v) => setState(() => prompt = v!)),
-    const SizedBox(height: 28), FilledButton(onPressed: end <= start ? null : () async { await SettingsRepository(ref.read(appDatabaseProvider)).saveTracking(TrackingSettings(startHour: start, endHour: end, promptMinutes: prompt)); await ref.read(todayControllerProvider.notifier).refresh(); ref.invalidate(trackingSettingsProvider); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tracking settings saved'))); }, child: const Text('Save settings')),
+    const SizedBox(height: 12), Text('Quiet hours (optional)', style: Theme.of(context).textTheme.titleSmall),
+    DropdownButtonFormField<int>(initialValue: quietStart, decoration: const InputDecoration(labelText: 'Quiet start'), items: <DropdownMenuItem<int>>[const DropdownMenuItem(value: -1, child: Text('Off')), ...List.generate(24, (int h) => DropdownMenuItem(value: h, child: Text('${h.toString().padLeft(2, '0')}:00')))], onChanged: (int? h) => setState(() => quietStart = h!)),
+    DropdownButtonFormField<int>(initialValue: quietEnd, decoration: const InputDecoration(labelText: 'Quiet end'), items: <DropdownMenuItem<int>>[const DropdownMenuItem(value: -1, child: Text('Off')), ...List.generate(24, (int h) => DropdownMenuItem(value: h, child: Text('${h.toString().padLeft(2, '0')}:00')))], onChanged: (int? h) => setState(() => quietEnd = h!)),
+    const SizedBox(height: 28), FilledButton(onPressed: end <= start || workingDays.isEmpty ? null : () async { await SettingsRepository(ref.read(appDatabaseProvider)).saveTracking(TrackingSettings(startHour: start, endHour: end, promptMinutes: prompt, workingDays: workingDays.toList()..sort(), quietStartHour: quietStart < 0 ? null : quietStart, quietEndHour: quietEnd < 0 ? null : quietEnd)); await ref.read(todayControllerProvider.notifier).refresh(); ref.invalidate(trackingSettingsProvider); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Tracking settings saved'))); }, child: const Text('Save settings')),
     const SizedBox(height: 32), Text('Data safety', style: Theme.of(context).textTheme.titleMedium),
     const Text('Create a portable JSON backup before changing devices or restoring app data.'),
+    ListTile(leading: const Icon(Icons.widgets_outlined), title: const Text('Home screen widget'), subtitle: const Text('Add a quick activity button to your Android home screen'), onTap: () => showDialog<void>(context: context, builder: (BuildContext dialog) => AlertDialog(title: const Text('Add the DayTrace widget'), content: const Text('Press and hold an empty area on your Android home screen, choose Widgets, then add “DayTrace quick activity”. Use Start activity to open a fast capture sheet.'), actions: <Widget>[TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Got it'))]))),
     ListTile(leading: const Icon(Icons.backup_outlined), title: const Text('Export backup'), subtitle: const Text('Share a schema-versioned JSON file'), onTap: () async { try { await BackupService(ref.read(appDatabaseProvider)).shareBackup(); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup could not be created.'))); } }),
     ListTile(leading: const Icon(Icons.settings_backup_restore_rounded), title: const Text('Restore backup'), subtitle: const Text('Replaces local data after an automatic safety backup'), onTap: () async { final bool? confirmed = await showDialog<bool>(context: context, builder: (BuildContext dialog) => AlertDialog(title: const Text('Restore backup?'), content: const Text('Current local data will be replaced. DayTrace creates a safety backup first.'), actions: <Widget>[TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Choose backup'))])); if (confirmed != true || !mounted) return; try { final bool restored = await BackupService(ref.read(appDatabaseProvider)).pickAndRestore(); if (mounted && restored) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup restored. Restart DayTrace to reload all screens.'))); } on FormatException catch (error) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message))); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup could not be restored.'))); } }),
+    ListTile(leading: const Icon(Icons.delete_forever_outlined), title: const Text('Clear all local data'), subtitle: const Text('Creates a safety backup first, then resets DayTrace'), onTap: () => _clearAllData(context)),
     const SizedBox(height: 32), Text('App updates', style: Theme.of(context).textTheme.titleMedium),
     ListTile(leading: const Icon(Icons.system_update_rounded), title: const Text('Check for update'), subtitle: const Text('Checks the latest GitHub release'), onTap: () => _checkUpdate(context)),
     ListTile(leading: const Icon(Icons.link_rounded), title: const Text('Update source'), subtitle: const Text('GitHub repository and optional direct APK link'), onTap: () => _editUpdateSource(context)),
@@ -56,6 +65,45 @@ class _TrackingSettingsFormState extends ConsumerState<_TrackingSettingsForm> {
 
   Future<void> _checkUpdate(BuildContext context) async {
     try { final AppUpdateInfo update = await AppUpdateService(ref.read(appDatabaseProvider)).checkForUpdate(); if (!mounted) return; if (!update.isAvailable) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('You are up to date (${update.currentVersion}).'))); return; } final bool? download = await showDialog<bool>(context: context, builder: (BuildContext dialog) => AlertDialog(title: const Text('Update available'), content: Text('${update.latestTag} is available. Current: ${update.currentVersion}.'), actions: <Widget>[TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Later')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Download APK'))])); if (download == true) await AppUpdateService(ref.read(appDatabaseProvider)).openDownload(update.downloadUrl); } on StateError catch (error) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message))); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not check for updates.'))); }
+  }
+
+  Future<void> _clearAllData(BuildContext context) async {
+    final TextEditingController confirmation = TextEditingController();
+    final bool? approved = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialog) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setDialogState) => AlertDialog(
+          title: const Text('Clear all local data?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Text('DayTrace first creates a safety backup, then removes all tasks, timers, reports, settings, and reminders from this phone.'),
+              TextField(
+                controller: confirmation,
+                decoration: const InputDecoration(labelText: 'Type CLEAR to continue'),
+                onChanged: (_) => setDialogState(() {}),
+                textCapitalization: TextCapitalization.characters,
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')),
+            FilledButton(onPressed: confirmation.text.trim() == 'CLEAR' ? () => Navigator.pop(dialog, true) : null, child: const Text('Clear data')),
+          ],
+        ),
+      ),
+    );
+    confirmation.dispose();
+    if (approved != true || !mounted) return;
+    try {
+      await BackupService(ref.read(appDatabaseProvider)).clearAllDataWithSafetyBackup();
+      ref.invalidate(trackingSettingsProvider);
+      ref.invalidate(onboardingProvider);
+      await ref.read(todayControllerProvider.notifier).refresh();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Local data cleared. Default categories are ready to use.')));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data could not be cleared safely. Nothing was removed.')));
+    }
   }
 
   Future<void> _editUpdateSource(BuildContext context) async {

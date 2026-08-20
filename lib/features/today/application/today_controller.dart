@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:daytrace/core/database/app_database.dart';
 import 'package:daytrace/core/notifications/notification_service.dart';
+import 'package:daytrace/core/platform/widget_launch_service.dart';
 import 'package:daytrace/core/voice/voice_capture_service.dart';
+import 'package:daytrace/features/reminders/application/end_of_day_review_policy.dart';
 import 'package:daytrace/features/reminders/application/smart_prompt_policy.dart';
 import 'package:daytrace/features/settings/data/settings_repository.dart';
 import 'package:daytrace/features/tasks/data/task_repository.dart';
@@ -28,12 +30,43 @@ final NotifierProvider<SmartPromptOpenNotifier, int>
     smartPromptOpenRequestProvider =
     NotifierProvider<SmartPromptOpenNotifier, int>(SmartPromptOpenNotifier.new);
 
+final NotifierProvider<SmartPromptPastActivityNotifier, int>
+    smartPromptPastActivityRequestProvider =
+    NotifierProvider<SmartPromptPastActivityNotifier, int>(
+      SmartPromptPastActivityNotifier.new,
+    );
+
+final NotifierProvider<EndOfDayReviewNotifier, int> endOfDayReviewRequestProvider =
+    NotifierProvider<EndOfDayReviewNotifier, int>(EndOfDayReviewNotifier.new);
+
 class SmartPromptOpenNotifier extends Notifier<int> {
   @override
   int build() => 0;
 
   void request() => state++;
 }
+
+class SmartPromptPastActivityNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+
+  void consume() => state = 0;
+}
+
+class EndOfDayReviewNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+
+  void consume() => state = 0;
+}
+
+final StreamProvider<int> widgetQuickAddProvider = StreamProvider<int>(
+  (Ref ref) => widgetLaunchService.quickAddRequests,
+);
 
 class TodayController extends AsyncNotifier<TodayData> {
   @override
@@ -187,10 +220,35 @@ class TodayController extends AsyncNotifier<TodayData> {
   Future<void> _handleNotificationAction(NotificationAction action) async {
     final TaskRepository repository = ref.read(taskRepositoryProvider);
     try {
+      if (action.kind == NotificationActionKind.endOfDayReview) {
+        if (action.actionId == 'review') {
+          ref.read(endOfDayReviewRequestProvider.notifier).request();
+        }
+        return;
+      }
+      if (action.kind == NotificationActionKind.activeTimer) {
+        switch (action.actionId) {
+          case 'pause_active':
+            await repository.pauseActiveTask();
+            break;
+          case 'complete_active':
+            final List<int> notificationIds = await repository.completeActiveTask();
+            await _cancelPlatformNotifications(notificationIds);
+            await _restoreFutureReminders();
+            break;
+          default:
+            return;
+        }
+        await refresh();
+        return;
+      }
       if (action.kind == NotificationActionKind.smartPrompt) {
         switch (action.actionId) {
           case 'open':
             ref.read(smartPromptOpenRequestProvider.notifier).request();
+            break;
+          case 'past':
+            ref.read(smartPromptPastActivityRequestProvider.notifier).request();
             break;
           case 'break':
             await repository.createTask(
@@ -295,6 +353,42 @@ class TodayController extends AsyncNotifier<TodayData> {
     } catch (_) {
       // Smart prompts are optional assistance and must not block offline tasks
       // when notification permission or device scheduling is unavailable.
+    }
+    await _syncEndOfDayReview(settings);
+    await _syncActiveTimerNotification(today);
+  }
+
+  Future<void> _syncActiveTimerNotification(TodayData today) async {
+    final NotificationService notifications = ref.read(notificationServiceProvider);
+    try {
+      final ActiveActivity? active = today.active;
+      if (active == null) {
+        await notifications.cancelActiveTimer();
+      } else {
+        await notifications.showActiveTimer(
+          title: active.title,
+          startedAt: active.startedAt,
+        );
+      }
+    } catch (_) {
+      // The timer remains correct in local storage if Android blocks alerts.
+    }
+  }
+
+  Future<void> _syncEndOfDayReview(TrackingSettings settings) async {
+    final NotificationService notifications = ref.read(notificationServiceProvider);
+    final DateTime? reviewAt = const EndOfDayReviewPolicy().nextReviewAt(
+      now: DateTime.now(),
+      settings: settings,
+    );
+    try {
+      if (reviewAt == null) {
+        await notifications.cancelEndOfDayReview();
+      } else {
+        await notifications.scheduleEndOfDayReview(scheduledAt: reviewAt);
+      }
+    } catch (_) {
+      // Daily review is optional and must not interrupt offline task work.
     }
   }
 

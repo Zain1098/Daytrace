@@ -46,6 +46,29 @@ class AppDatabase implements QueryExecutorUser {
 
   Future<void> close() => _executor.close();
 
+  /// Removes user records only after a caller has created a recoverable backup.
+  /// Schema migration history stays intact and the required default categories
+  /// are immediately re-seeded in the same transaction.
+  Future<void> clearAllUserData() async {
+    await initialize();
+    await transaction<void>((QueryExecutor executor) async {
+      for (final String table in <String>[
+        'generated_summaries',
+        'daily_notes',
+        'reminders',
+        'time_entries',
+        'subtasks',
+        'tasks',
+        'recurrence_rules',
+        'categories',
+        'app_settings',
+      ]) {
+        await executor.runDelete('DELETE FROM $table', const <Object?>[]);
+      }
+      await _seedDefaultCategories(executor);
+    });
+  }
+
   @override
   Future<void> beforeOpen(QueryExecutor executor, OpeningDetails details) async {
     await executor.runCustom('PRAGMA foreign_keys = ON');
