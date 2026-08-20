@@ -138,6 +138,11 @@ class NotificationService {
               showsUserInterface: true,
             ),
             AndroidNotificationAction(
+              'past',
+              'Add past activity',
+              showsUserInterface: true,
+            ),
+            AndroidNotificationAction(
               'break',
               'Start break',
               showsUserInterface: true,

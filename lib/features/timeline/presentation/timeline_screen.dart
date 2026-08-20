@@ -11,6 +11,17 @@ class TimelineScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.listen<int>(
+      smartPromptPastActivityRequestProvider,
+      (int? previous, int next) {
+        if (next <= 0 || next == previous) return;
+        ref.read(smartPromptPastActivityRequestProvider.notifier).consume();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (context.mounted) _showManualEntry(context, ref);
+        });
+      },
+      fireImmediately: true,
+    );
     final AsyncValue<List<TimelineItem>> items = ref.watch(timelineControllerProvider);
     final TrackingSettings tracking = ref.watch(trackingSettingsProvider).value ?? const TrackingSettings();
     final DateTime day = ref.watch(timelineDayProvider);

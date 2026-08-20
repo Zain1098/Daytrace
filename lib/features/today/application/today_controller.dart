@@ -29,11 +29,26 @@ final NotifierProvider<SmartPromptOpenNotifier, int>
     smartPromptOpenRequestProvider =
     NotifierProvider<SmartPromptOpenNotifier, int>(SmartPromptOpenNotifier.new);
 
+final NotifierProvider<SmartPromptPastActivityNotifier, int>
+    smartPromptPastActivityRequestProvider =
+    NotifierProvider<SmartPromptPastActivityNotifier, int>(
+      SmartPromptPastActivityNotifier.new,
+    );
+
 class SmartPromptOpenNotifier extends Notifier<int> {
   @override
   int build() => 0;
 
   void request() => state++;
+}
+
+class SmartPromptPastActivityNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+
+  void consume() => state = 0;
 }
 
 final StreamProvider<int> widgetQuickAddProvider = StreamProvider<int>(
@@ -196,6 +211,9 @@ class TodayController extends AsyncNotifier<TodayData> {
         switch (action.actionId) {
           case 'open':
             ref.read(smartPromptOpenRequestProvider.notifier).request();
+            break;
+          case 'past':
+            ref.read(smartPromptPastActivityRequestProvider.notifier).request();
             break;
           case 'break':
             await repository.createTask(

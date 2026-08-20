@@ -6,6 +6,7 @@ import 'package:daytrace/features/tasks/data/task_repository.dart';
 import 'package:daytrace/features/today/application/today_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 class TodayScreen extends ConsumerWidget {
   const TodayScreen({super.key});
@@ -18,6 +19,17 @@ class TodayScreen extends ConsumerWidget {
         if (next > 0 && next != previous) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (context.mounted) _showQuickAdd(context, ref, startNow: true);
+          });
+        }
+      },
+      fireImmediately: true,
+    );
+    ref.listen<int>(
+      smartPromptPastActivityRequestProvider,
+      (int? previous, int next) {
+        if (next > 0 && next != previous) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) context.go('/timeline');
           });
         }
       },
