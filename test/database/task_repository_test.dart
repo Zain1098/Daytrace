@@ -517,4 +517,17 @@ void main() {
     await settings.setOnboardingComplete(true);
     expect(await settings.isOnboardingComplete(), isTrue);
   });
+
+  test('onboarding tracking preferences use the existing local settings store', () async {
+    final SettingsRepository settings = SettingsRepository(database);
+
+    await settings.saveTracking(
+      const TrackingSettings(startHour: 8, endHour: 18, promptMinutes: 45),
+    );
+    final TrackingSettings saved = await settings.loadTracking();
+
+    expect(saved.startHour, 8);
+    expect(saved.endHour, 18);
+    expect(saved.promptMinutes, 45);
+  });
 }

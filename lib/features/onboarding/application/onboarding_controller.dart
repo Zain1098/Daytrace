@@ -12,7 +12,13 @@ class OnboardingController extends AsyncNotifier<bool> {
   @override
   Future<bool> build() => _settings.isOnboardingComplete();
 
-  Future<void> complete({required bool requestNotifications}) async {
+  Future<void> complete({
+    required bool requestNotifications,
+    TrackingSettings? trackingSettings,
+  }) async {
+    if (trackingSettings != null) {
+      await _settings.saveTracking(trackingSettings);
+    }
     if (requestNotifications) {
       await ref.read(notificationServiceProvider).requestPermission();
     }

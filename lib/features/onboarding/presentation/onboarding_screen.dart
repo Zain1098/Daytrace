@@ -1,4 +1,5 @@
 import 'package:daytrace/features/onboarding/application/onboarding_controller.dart';
+import 'package:daytrace/features/settings/data/settings_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -13,6 +14,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final PageController _pageController = PageController();
   int _page = 0;
   bool _isCompleting = false;
+  TrackingSettings? _trackingSettings;
 
   static const List<_OnboardingPage> _pages = <_OnboardingPage>[
     _OnboardingPage(
@@ -47,7 +49,10 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     try {
       await ref
           .read(onboardingProvider.notifier)
-          .complete(requestNotifications: requestNotifications);
+          .complete(
+            requestNotifications: requestNotifications,
+            trackingSettings: _trackingSettings,
+          );
     } finally {
       if (mounted) setState(() => _isCompleting = false);
     }
@@ -58,6 +63,17 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOut,
     );
+  }
+
+  Future<void> _configureTracking() async {
+    final TrackingSettings? selection = await showDialog<TrackingSettings>(
+      context: context,
+      builder: (BuildContext context) => _TrackingSetupDialog(
+        initial: _trackingSettings ?? const TrackingSettings(),
+      ),
+    );
+    if (!mounted || selection == null) return;
+    setState(() => _trackingSettings = selection);
   }
 
   @override
@@ -118,6 +134,8 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               else
                 _CompletionActions(
                   isCompleting: _isCompleting,
+                  hasTrackingSetup: _trackingSettings != null,
+                  onConfigureTracking: _configureTracking,
                   onEnableNotifications: () =>
                       _complete(requestNotifications: true),
                   onContinueWithoutNotifications: () =>
@@ -180,11 +198,15 @@ class _OnboardingPageView extends StatelessWidget {
 class _CompletionActions extends StatelessWidget {
   const _CompletionActions({
     required this.isCompleting,
+    required this.hasTrackingSetup,
+    required this.onConfigureTracking,
     required this.onEnableNotifications,
     required this.onContinueWithoutNotifications,
   });
 
   final bool isCompleting;
+  final bool hasTrackingSetup;
+  final VoidCallback onConfigureTracking;
   final VoidCallback onEnableNotifications;
   final VoidCallback onContinueWithoutNotifications;
 
@@ -200,6 +222,14 @@ class _CompletionActions extends StatelessWidget {
                 ),
           ),
           const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: isCompleting ? null : onConfigureTracking,
+            icon: const Icon(Icons.tune_rounded),
+            label: Text(
+              hasTrackingSetup ? 'Tracking hours configured' : 'Set tracking hours (optional)',
+            ),
+          ),
+          const SizedBox(height: 8),
           FilledButton(
             onPressed: isCompleting ? null : onEnableNotifications,
             child: const Text('Enable notifications'),
@@ -211,6 +241,104 @@ class _CompletionActions extends StatelessWidget {
         ],
       );
 }
+
+class _TrackingSetupDialog extends StatefulWidget {
+  const _TrackingSetupDialog({required this.initial});
+
+  final TrackingSettings initial;
+
+  @override
+  State<_TrackingSetupDialog> createState() => _TrackingSetupDialogState();
+}
+
+class _TrackingSetupDialogState extends State<_TrackingSetupDialog> {
+  late int _start = widget.initial.startHour;
+  late int _end = widget.initial.endHour;
+  late int _prompt = widget.initial.promptMinutes;
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: const Text('Tracking hours'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Text('Smart prompts only run inside these hours.'),
+              const SizedBox(height: 12),
+              _HourSelector(
+                label: 'Start',
+                value: _start,
+                onChanged: (int value) => setState(() => _start = value),
+              ),
+              _HourSelector(
+                label: 'End',
+                value: _end,
+                onChanged: (int value) => setState(() => _end = value),
+              ),
+              DropdownButtonFormField<int>(
+                initialValue: _prompt,
+                decoration: const InputDecoration(labelText: 'Prompt interval'),
+                items: const <DropdownMenuItem<int>>[
+                  DropdownMenuItem(value: 0, child: Text('Off')),
+                  DropdownMenuItem(value: 30, child: Text('30 minutes')),
+                  DropdownMenuItem(value: 45, child: Text('45 minutes')),
+                  DropdownMenuItem(value: 60, child: Text('60 minutes')),
+                  DropdownMenuItem(value: 90, child: Text('90 minutes')),
+                  DropdownMenuItem(value: 120, child: Text('120 minutes')),
+                ],
+                onChanged: (int? value) => setState(() => _prompt = value ?? 60),
+              ),
+            ],
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _end <= _start
+                ? null
+                : () => Navigator.pop(
+                      context,
+                      TrackingSettings(
+                        startHour: _start,
+                        endHour: _end,
+                        promptMinutes: _prompt,
+                      ),
+                    ),
+            child: const Text('Use these hours'),
+          ),
+        ],
+      );
+}
+
+class _HourSelector extends StatelessWidget {
+  const _HourSelector({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<int>(
+        initialValue: value,
+        decoration: InputDecoration(labelText: label),
+        items: List<DropdownMenuItem<int>>.generate(
+          24,
+          (int hour) => DropdownMenuItem<int>(
+            value: hour,
+            child: Text('${hour.toString().padLeft(2, '0')}:00'),
+          ),
+        ),
+        onChanged: (int? value) {
+          if (value != null) onChanged(value);
+        },
+      );
 
 class _OnboardingPage {
   const _OnboardingPage({
