@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:daytrace/core/voice/voice_capture_service.dart';
+import 'package:daytrace/core/voice/voice_command.dart';
 import 'package:daytrace/features/tasks/data/task_repository.dart';
 import 'package:daytrace/features/today/application/today_controller.dart';
 import 'package:flutter/material.dart';
@@ -105,6 +106,7 @@ class TodayScreen extends ConsumerWidget {
             onSave: (_TaskPlanningDraft draft) async {
             try {
               final TodayController todayController = ref.read(todayControllerProvider.notifier);
+              final bool shouldStartNow = draft.startNow;
               if (draft.scheduleReminder &&
                   !await todayController.requestNotificationPermission()) {
                 if (sheetContext.mounted) {
@@ -118,7 +120,7 @@ class TodayScreen extends ConsumerWidget {
               }
               await todayController.createTask(
                     title: controller.text,
-                    startNow: startNow,
+                    startNow: shouldStartNow,
                     categoryId: draft.categoryId,
                     description: draft.description,
                     priority: draft.priority,
@@ -132,14 +134,14 @@ class TodayScreen extends ConsumerWidget {
               Navigator.of(sheetContext).pop();
               if (!context.mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(startNow ? 'Activity started.' : 'Task saved.')),
+                SnackBar(content: Text(shouldStartNow ? 'Activity started.' : 'Task saved.')),
               );
             } on ArgumentError catch (error) {
               ScaffoldMessenger.of(sheetContext).showSnackBar(
                 SnackBar(content: Text(error.message?.toString() ?? 'Enter a title.')),
               );
             } on StateError catch (error) {
-              if (!startNow) {
+              if (!shouldStartNow) {
                 ScaffoldMessenger.of(sheetContext).showSnackBar(
                   SnackBar(content: Text(error.message)),
                 );
@@ -429,6 +431,7 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
   String _recurrence = 'none';
   final Set<int> _selectedWeekdays = <int>{};
   bool _listening = false;
+  bool _voiceStartNow = false;
 
   @override
   void initState() {
@@ -454,12 +457,12 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
     crossAxisAlignment: CrossAxisAlignment.start,
     children: <Widget>[
       Text(
-        widget.startNow ? 'Start an activity' : 'Quick add',
+        (widget.startNow || _voiceStartNow) ? 'Start an activity' : 'Quick add',
         style: Theme.of(context).textTheme.headlineSmall,
       ),
       const SizedBox(height: 8),
       Text(
-        widget.startNow
+        (widget.startNow || _voiceStartNow)
             ? 'Give this activity a clear title before starting the timer.'
             : 'Capture the task first. You can organise the details later.',
         style: Theme.of(context).textTheme.bodyMedium,
@@ -616,6 +619,7 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
               return;
             }
             widget.onSave(_TaskPlanningDraft(
+              startNow: widget.startNow || _voiceStartNow,
               categoryId: _categoryId,
               description: _descriptionController.text,
               priority: _priority,
@@ -626,8 +630,14 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
               scheduleReminder: _scheduleReminder,
             ));
           },
-          icon: Icon(widget.startNow ? Icons.play_arrow_rounded : Icons.add_task_rounded),
-          label: Text(widget.startNow ? 'Start activity' : 'Save task'),
+          icon: Icon(
+            (widget.startNow || _voiceStartNow)
+                ? Icons.play_arrow_rounded
+                : Icons.add_task_rounded,
+          ),
+          label: Text(
+            (widget.startNow || _voiceStartNow) ? 'Start activity' : 'Save task',
+          ),
         ),
       ),
     ],
@@ -658,9 +668,15 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
       return;
     }
     final bool started = await voice.start(onResult: (String transcript, bool isFinal) {
-      widget.controller.text = transcript;
-      widget.controller.selection = TextSelection.collapsed(offset: transcript.length);
-      if (isFinal && mounted) setState(() => _listening = false);
+      final VoiceCommand command = VoiceCommand.parse(transcript);
+      widget.controller.text = command.title;
+      widget.controller.selection = TextSelection.collapsed(offset: command.title.length);
+      if (mounted) {
+        setState(() {
+          _voiceStartNow = command.intent == VoiceCommandIntent.startTask;
+          if (isFinal) _listening = false;
+        });
+      }
     });
     if (!mounted) return;
     setState(() => _listening = started);
@@ -683,6 +699,7 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
 
 class _TaskPlanningDraft {
   const _TaskPlanningDraft({
+    required this.startNow,
     required this.categoryId,
     required this.description,
     required this.priority,
@@ -693,6 +710,7 @@ class _TaskPlanningDraft {
     required this.scheduleReminder,
   });
 
+  final bool startNow;
   final String? categoryId;
   final String description;
   final String priority;
