@@ -101,6 +101,14 @@ void main() {
       ),
       isNull,
     );
+    expect(
+      policy.nextPromptAt(
+        now: DateTime(2026, 8, 23, 10), // Sunday, not in default work days.
+        settings: settings,
+        activeActivity: null,
+      ),
+      isNull,
+    );
   });
 
   test('task persists the selected category', () async {
@@ -522,12 +530,18 @@ void main() {
     final SettingsRepository settings = SettingsRepository(database);
 
     await settings.saveTracking(
-      const TrackingSettings(startHour: 8, endHour: 18, promptMinutes: 45),
+      const TrackingSettings(
+        startHour: 8,
+        endHour: 18,
+        promptMinutes: 45,
+        workingDays: <int>[DateTime.monday, DateTime.saturday],
+      ),
     );
     final TrackingSettings saved = await settings.loadTracking();
 
     expect(saved.startHour, 8);
     expect(saved.endHour, 18);
     expect(saved.promptMinutes, 45);
+    expect(saved.workingDays, <int>[DateTime.monday, DateTime.saturday]);
   });
 }

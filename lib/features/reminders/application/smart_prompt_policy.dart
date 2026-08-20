@@ -14,6 +14,7 @@ class SmartPromptPolicy {
     if (activeActivity != null || settings.promptMinutes <= 0) return null;
 
     final DateTime localNow = now.toLocal();
+    if (!settings.workingDays.contains(localNow.weekday)) return null;
     final DateTime start = DateTime(
       localNow.year,
       localNow.month,

@@ -255,6 +255,7 @@ class _TrackingSetupDialogState extends State<_TrackingSetupDialog> {
   late int _start = widget.initial.startHour;
   late int _end = widget.initial.endHour;
   late int _prompt = widget.initial.promptMinutes;
+  late final Set<int> _workingDays = widget.initial.workingDays.toSet();
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -274,6 +275,39 @@ class _TrackingSetupDialogState extends State<_TrackingSetupDialog> {
                 label: 'End',
                 value: _end,
                 onChanged: (int value) => setState(() => _end = value),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  'Working days',
+                  style: Theme.of(context).textTheme.labelLarge,
+                ),
+              ),
+              Wrap(
+                spacing: 6,
+                children: <Widget>[
+                  for (final (int day, String label) in <(int, String)>[
+                    (DateTime.monday, 'M'),
+                    (DateTime.tuesday, 'T'),
+                    (DateTime.wednesday, 'W'),
+                    (DateTime.thursday, 'T'),
+                    (DateTime.friday, 'F'),
+                    (DateTime.saturday, 'S'),
+                    (DateTime.sunday, 'S'),
+                  ])
+                    FilterChip(
+                      label: Text(label),
+                      selected: _workingDays.contains(day),
+                      onSelected: (bool selected) => setState(() {
+                        if (selected) {
+                          _workingDays.add(day);
+                        } else {
+                          _workingDays.remove(day);
+                        }
+                      }),
+                    ),
+                ],
               ),
               DropdownButtonFormField<int>(
                 initialValue: _prompt,
@@ -297,7 +331,7 @@ class _TrackingSetupDialogState extends State<_TrackingSetupDialog> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: _end <= _start
+            onPressed: _end <= _start || _workingDays.isEmpty
                 ? null
                 : () => Navigator.pop(
                       context,
@@ -305,6 +339,7 @@ class _TrackingSetupDialogState extends State<_TrackingSetupDialog> {
                         startHour: _start,
                         endHour: _end,
                         promptMinutes: _prompt,
+                        workingDays: _workingDays.toList()..sort(),
                       ),
                     ),
             child: const Text('Use these hours'),

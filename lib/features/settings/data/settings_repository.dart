@@ -18,6 +18,11 @@ class SettingsRepository {
       startHour: value['startHour'] as int? ?? 9,
       endHour: value['endHour'] as int? ?? 17,
       promptMinutes: value['promptMinutes'] as int? ?? 60,
+      workingDays: (value['workingDays'] as List<dynamic>?)
+              ?.whereType<int>()
+              .where((int day) => day >= DateTime.monday && day <= DateTime.sunday)
+              .toList(growable: false) ??
+          TrackingSettings.defaultWorkingDays,
     );
   }
 
@@ -75,9 +80,30 @@ class SettingsRepository {
 }
 
 class TrackingSettings {
-  const TrackingSettings({this.startHour = 9, this.endHour = 17, this.promptMinutes = 60});
+  const TrackingSettings({
+    this.startHour = 9,
+    this.endHour = 17,
+    this.promptMinutes = 60,
+    this.workingDays = defaultWorkingDays,
+  });
+
+  static const List<int> defaultWorkingDays = <int>[
+    DateTime.monday,
+    DateTime.tuesday,
+    DateTime.wednesday,
+    DateTime.thursday,
+    DateTime.friday,
+  ];
+
   final int startHour;
   final int endHour;
   final int promptMinutes;
-  Map<String, dynamic> toJson() => <String, dynamic>{'startHour': startHour, 'endHour': endHour, 'promptMinutes': promptMinutes};
+  final List<int> workingDays;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+        'startHour': startHour,
+        'endHour': endHour,
+        'promptMinutes': promptMinutes,
+        'workingDays': workingDays,
+      };
 }
