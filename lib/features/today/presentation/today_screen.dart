@@ -698,6 +698,20 @@ class _QuickAddSheetState extends ConsumerState<_QuickAddSheet> {
       if (mounted) {
         setState(() {
           _voiceStartNow = command.intent == VoiceCommandIntent.startTask;
+          final VoiceReminderTime? reminderTime = command.reminderTime;
+          if (reminderTime != null) {
+            final DateTime now = DateTime.now();
+            DateTime due = DateTime(
+              now.year,
+              now.month,
+              now.day,
+              reminderTime.hour,
+              reminderTime.minute,
+            );
+            if (!due.isAfter(now)) due = due.add(const Duration(days: 1));
+            _dueAt = due;
+            _scheduleReminder = true;
+          }
           if (isFinal) _listening = false;
         });
       }

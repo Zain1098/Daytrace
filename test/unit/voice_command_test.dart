@@ -22,4 +22,15 @@ void main() {
     expect(command.title, 'Review timeline after lunch');
     expect(command.intent, VoiceCommandIntent.saveTask);
   });
+
+  test('reminder command extracts a locally editable 12-hour time', () {
+    final VoiceCommand command = VoiceCommand.parse(
+      'Remind me to study at 8:30 PM',
+    );
+
+    expect(command.title, 'study');
+    expect(command.intent, VoiceCommandIntent.scheduleReminder);
+    expect(command.reminderTime?.hour, 20);
+    expect(command.reminderTime?.minute, 30);
+  });
 }
