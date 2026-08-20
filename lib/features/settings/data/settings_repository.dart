@@ -23,6 +23,8 @@ class SettingsRepository {
               .where((int day) => day >= DateTime.monday && day <= DateTime.sunday)
               .toList(growable: false) ??
           TrackingSettings.defaultWorkingDays,
+      quietStartHour: value['quietStartHour'] as int?,
+      quietEndHour: value['quietEndHour'] as int?,
     );
   }
 
@@ -85,6 +87,8 @@ class TrackingSettings {
     this.endHour = 17,
     this.promptMinutes = 60,
     this.workingDays = defaultWorkingDays,
+    this.quietStartHour,
+    this.quietEndHour,
   });
 
   static const List<int> defaultWorkingDays = <int>[
@@ -99,11 +103,15 @@ class TrackingSettings {
   final int endHour;
   final int promptMinutes;
   final List<int> workingDays;
+  final int? quietStartHour;
+  final int? quietEndHour;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
         'startHour': startHour,
         'endHour': endHour,
         'promptMinutes': promptMinutes,
         'workingDays': workingDays,
+        'quietStartHour': quietStartHour,
+        'quietEndHour': quietEndHour,
       };
 }

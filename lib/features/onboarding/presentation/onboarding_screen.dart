@@ -256,6 +256,8 @@ class _TrackingSetupDialogState extends State<_TrackingSetupDialog> {
   late int _end = widget.initial.endHour;
   late int _prompt = widget.initial.promptMinutes;
   late final Set<int> _workingDays = widget.initial.workingDays.toSet();
+  late int _quietStart = widget.initial.quietStartHour ?? -1;
+  late int _quietEnd = widget.initial.quietEndHour ?? -1;
 
   @override
   Widget build(BuildContext context) => AlertDialog(
@@ -322,6 +324,21 @@ class _TrackingSetupDialogState extends State<_TrackingSetupDialog> {
                 ],
                 onChanged: (int? value) => setState(() => _prompt = value ?? 60),
               ),
+              const SizedBox(height: 12),
+              const Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text('Quiet hours (optional)'),
+              ),
+              _QuietHourSelector(
+                label: 'Quiet start',
+                value: _quietStart,
+                onChanged: (int value) => setState(() => _quietStart = value),
+              ),
+              _QuietHourSelector(
+                label: 'Quiet end',
+                value: _quietEnd,
+                onChanged: (int value) => setState(() => _quietEnd = value),
+              ),
             ],
           ),
         ),
@@ -340,6 +357,8 @@ class _TrackingSetupDialogState extends State<_TrackingSetupDialog> {
                         endHour: _end,
                         promptMinutes: _prompt,
                         workingDays: _workingDays.toList()..sort(),
+                        quietStartHour: _quietStart < 0 ? null : _quietStart,
+                        quietEndHour: _quietEnd < 0 ? null : _quietEnd,
                       ),
                     ),
             child: const Text('Use these hours'),
@@ -370,6 +389,36 @@ class _HourSelector extends StatelessWidget {
             child: Text('${hour.toString().padLeft(2, '0')}:00'),
           ),
         ),
+        onChanged: (int? value) {
+          if (value != null) onChanged(value);
+        },
+      );
+
+class _QuietHourSelector extends StatelessWidget {
+  const _QuietHourSelector({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) => DropdownButtonFormField<int>(
+        initialValue: value,
+        decoration: InputDecoration(labelText: label),
+        items: <DropdownMenuItem<int>>[
+          const DropdownMenuItem<int>(value: -1, child: Text('Off')),
+          ...List<DropdownMenuItem<int>>.generate(
+            24,
+            (int hour) => DropdownMenuItem<int>(
+              value: hour,
+              child: Text('${hour.toString().padLeft(2, '0')}:00'),
+            ),
+          ),
+        ],
         onChanged: (int? value) {
           if (value != null) onChanged(value);
         },

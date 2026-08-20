@@ -101,6 +101,21 @@ void main() {
       ),
       isNull,
     );
+    const TrackingSettings quietSettings = TrackingSettings(
+      startHour: 9,
+      endHour: 23,
+      promptMinutes: 60,
+      quietStartHour: 22,
+      quietEndHour: 7,
+    );
+    expect(
+      policy.nextPromptAt(
+        now: DateTime(2026, 8, 19, 22),
+        settings: quietSettings,
+        activeActivity: null,
+      ),
+      isNull,
+    );
     expect(
       policy.nextPromptAt(
         now: DateTime(2026, 8, 23, 10), // Sunday, not in default work days.
@@ -535,6 +550,8 @@ void main() {
         endHour: 18,
         promptMinutes: 45,
         workingDays: <int>[DateTime.monday, DateTime.saturday],
+        quietStartHour: 22,
+        quietEndHour: 7,
       ),
     );
     final TrackingSettings saved = await settings.loadTracking();
@@ -543,5 +560,7 @@ void main() {
     expect(saved.endHour, 18);
     expect(saved.promptMinutes, 45);
     expect(saved.workingDays, <int>[DateTime.monday, DateTime.saturday]);
+    expect(saved.quietStartHour, 22);
+    expect(saved.quietEndHour, 7);
   });
 }

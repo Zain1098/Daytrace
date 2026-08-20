@@ -15,6 +15,7 @@ class SmartPromptPolicy {
 
     final DateTime localNow = now.toLocal();
     if (!settings.workingDays.contains(localNow.weekday)) return null;
+    if (_isQuietHour(localNow.hour, settings)) return null;
     final DateTime start = DateTime(
       localNow.year,
       localNow.month,
@@ -33,5 +34,14 @@ class SmartPromptPolicy {
       Duration(minutes: settings.promptMinutes),
     );
     return prompt.isBefore(end) ? prompt.toUtc() : null;
+  }
+
+  bool _isQuietHour(int hour, TrackingSettings settings) {
+    final int? start = settings.quietStartHour;
+    final int? end = settings.quietEndHour;
+    if (start == null || end == null || start == end) return false;
+    return start < end
+        ? hour >= start && hour < end
+        : hour >= start || hour < end;
   }
 }
