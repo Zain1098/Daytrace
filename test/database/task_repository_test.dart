@@ -563,4 +563,19 @@ void main() {
     expect(saved.quietStartHour, 22);
     expect(saved.quietEndHour, 7);
   });
+
+  test('clearing local data preserves the default categories and schema', () async {
+    await repository.createTask(title: 'Temporary task', startNow: false);
+    await database.clearAllUserData();
+
+    expect(await database.select('SELECT id FROM tasks'), isEmpty);
+    expect(
+      await database.select('SELECT id FROM categories ORDER BY sort_order'),
+      hasLength(6),
+    );
+    expect(
+      await database.select('SELECT version FROM schema_migrations ORDER BY version'),
+      hasLength(2),
+    );
+  });
 }

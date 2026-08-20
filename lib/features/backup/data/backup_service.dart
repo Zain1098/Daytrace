@@ -58,6 +58,12 @@ class BackupService {
     );
   }
 
+  Future<File> clearAllDataWithSafetyBackup() async {
+    final File safetyBackup = await createBackupFile();
+    await _database.clearAllUserData();
+    return safetyBackup;
+  }
+
   Future<bool> pickAndRestore() async {
     final List<PlatformFile> files = await FilePicker.pickFiles(
       type: FileType.custom,

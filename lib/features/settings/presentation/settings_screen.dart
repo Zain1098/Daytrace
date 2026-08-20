@@ -1,5 +1,6 @@
 import 'package:daytrace/features/settings/data/settings_repository.dart';
 import 'package:daytrace/features/backup/data/backup_service.dart';
+import 'package:daytrace/features/onboarding/application/onboarding_controller.dart';
 import 'package:daytrace/features/updates/data/app_update_service.dart';
 import 'package:daytrace/features/today/application/today_controller.dart';
 import 'package:daytrace/features/ai_summary/data/ai_summary_service.dart';
@@ -53,6 +54,7 @@ class _TrackingSettingsFormState extends ConsumerState<_TrackingSettingsForm> {
     ListTile(leading: const Icon(Icons.widgets_outlined), title: const Text('Home screen widget'), subtitle: const Text('Add a quick activity button to your Android home screen'), onTap: () => showDialog<void>(context: context, builder: (BuildContext dialog) => AlertDialog(title: const Text('Add the DayTrace widget'), content: const Text('Press and hold an empty area on your Android home screen, choose Widgets, then add “DayTrace quick activity”. Use Start activity to open a fast capture sheet.'), actions: <Widget>[TextButton(onPressed: () => Navigator.pop(dialog), child: const Text('Got it'))]))),
     ListTile(leading: const Icon(Icons.backup_outlined), title: const Text('Export backup'), subtitle: const Text('Share a schema-versioned JSON file'), onTap: () async { try { await BackupService(ref.read(appDatabaseProvider)).shareBackup(); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup could not be created.'))); } }),
     ListTile(leading: const Icon(Icons.settings_backup_restore_rounded), title: const Text('Restore backup'), subtitle: const Text('Replaces local data after an automatic safety backup'), onTap: () async { final bool? confirmed = await showDialog<bool>(context: context, builder: (BuildContext dialog) => AlertDialog(title: const Text('Restore backup?'), content: const Text('Current local data will be replaced. DayTrace creates a safety backup first.'), actions: <Widget>[TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Choose backup'))])); if (confirmed != true || !mounted) return; try { final bool restored = await BackupService(ref.read(appDatabaseProvider)).pickAndRestore(); if (mounted && restored) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup restored. Restart DayTrace to reload all screens.'))); } on FormatException catch (error) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message))); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Backup could not be restored.'))); } }),
+    ListTile(leading: const Icon(Icons.delete_forever_outlined), title: const Text('Clear all local data'), subtitle: const Text('Creates a safety backup first, then resets DayTrace'), onTap: () => _clearAllData(context)),
     const SizedBox(height: 32), Text('App updates', style: Theme.of(context).textTheme.titleMedium),
     ListTile(leading: const Icon(Icons.system_update_rounded), title: const Text('Check for update'), subtitle: const Text('Checks the latest GitHub release'), onTap: () => _checkUpdate(context)),
     ListTile(leading: const Icon(Icons.link_rounded), title: const Text('Update source'), subtitle: const Text('GitHub repository and optional direct APK link'), onTap: () => _editUpdateSource(context)),
@@ -63,6 +65,45 @@ class _TrackingSettingsFormState extends ConsumerState<_TrackingSettingsForm> {
 
   Future<void> _checkUpdate(BuildContext context) async {
     try { final AppUpdateInfo update = await AppUpdateService(ref.read(appDatabaseProvider)).checkForUpdate(); if (!mounted) return; if (!update.isAvailable) { ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('You are up to date (${update.currentVersion}).'))); return; } final bool? download = await showDialog<bool>(context: context, builder: (BuildContext dialog) => AlertDialog(title: const Text('Update available'), content: Text('${update.latestTag} is available. Current: ${update.currentVersion}.'), actions: <Widget>[TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Later')), FilledButton(onPressed: () => Navigator.pop(dialog, true), child: const Text('Download APK'))])); if (download == true) await AppUpdateService(ref.read(appDatabaseProvider)).openDownload(update.downloadUrl); } on StateError catch (error) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.message))); } catch (_) { if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not check for updates.'))); }
+  }
+
+  Future<void> _clearAllData(BuildContext context) async {
+    final TextEditingController confirmation = TextEditingController();
+    final bool? approved = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialog) => StatefulBuilder(
+        builder: (BuildContext context, StateSetter setDialogState) => AlertDialog(
+          title: const Text('Clear all local data?'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const Text('DayTrace first creates a safety backup, then removes all tasks, timers, reports, settings, and reminders from this phone.'),
+              TextField(
+                controller: confirmation,
+                decoration: const InputDecoration(labelText: 'Type CLEAR to continue'),
+                onChanged: (_) => setDialogState(() {}),
+                textCapitalization: TextCapitalization.characters,
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(onPressed: () => Navigator.pop(dialog, false), child: const Text('Cancel')),
+            FilledButton(onPressed: confirmation.text.trim() == 'CLEAR' ? () => Navigator.pop(dialog, true) : null, child: const Text('Clear data')),
+          ],
+        ),
+      ),
+    );
+    confirmation.dispose();
+    if (approved != true || !mounted) return;
+    try {
+      await BackupService(ref.read(appDatabaseProvider)).clearAllDataWithSafetyBackup();
+      ref.invalidate(trackingSettingsProvider);
+      ref.invalidate(onboardingProvider);
+      await ref.read(todayControllerProvider.notifier).refresh();
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Local data cleared. Default categories are ready to use.')));
+    } catch (_) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Data could not be cleared safely. Nothing was removed.')));
+    }
   }
 
   Future<void> _editUpdateSource(BuildContext context) async {
