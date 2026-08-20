@@ -4,6 +4,7 @@ import 'package:daytrace/core/database/app_database.dart';
 import 'package:daytrace/core/notifications/notification_service.dart';
 import 'package:daytrace/core/platform/widget_launch_service.dart';
 import 'package:daytrace/core/voice/voice_capture_service.dart';
+import 'package:daytrace/features/reminders/application/end_of_day_review_policy.dart';
 import 'package:daytrace/features/reminders/application/smart_prompt_policy.dart';
 import 'package:daytrace/features/settings/data/settings_repository.dart';
 import 'package:daytrace/features/tasks/data/task_repository.dart';
@@ -35,6 +36,9 @@ final NotifierProvider<SmartPromptPastActivityNotifier, int>
       SmartPromptPastActivityNotifier.new,
     );
 
+final NotifierProvider<EndOfDayReviewNotifier, int> endOfDayReviewRequestProvider =
+    NotifierProvider<EndOfDayReviewNotifier, int>(EndOfDayReviewNotifier.new);
+
 class SmartPromptOpenNotifier extends Notifier<int> {
   @override
   int build() => 0;
@@ -43,6 +47,15 @@ class SmartPromptOpenNotifier extends Notifier<int> {
 }
 
 class SmartPromptPastActivityNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+
+  void consume() => state = 0;
+}
+
+class EndOfDayReviewNotifier extends Notifier<int> {
   @override
   int build() => 0;
 
@@ -207,6 +220,12 @@ class TodayController extends AsyncNotifier<TodayData> {
   Future<void> _handleNotificationAction(NotificationAction action) async {
     final TaskRepository repository = ref.read(taskRepositoryProvider);
     try {
+      if (action.kind == NotificationActionKind.endOfDayReview) {
+        if (action.actionId == 'review') {
+          ref.read(endOfDayReviewRequestProvider.notifier).request();
+        }
+        return;
+      }
       if (action.kind == NotificationActionKind.smartPrompt) {
         switch (action.actionId) {
           case 'open':
@@ -318,6 +337,24 @@ class TodayController extends AsyncNotifier<TodayData> {
     } catch (_) {
       // Smart prompts are optional assistance and must not block offline tasks
       // when notification permission or device scheduling is unavailable.
+    }
+    await _syncEndOfDayReview(settings);
+  }
+
+  Future<void> _syncEndOfDayReview(TrackingSettings settings) async {
+    final NotificationService notifications = ref.read(notificationServiceProvider);
+    final DateTime? reviewAt = const EndOfDayReviewPolicy().nextReviewAt(
+      now: DateTime.now(),
+      settings: settings,
+    );
+    try {
+      if (reviewAt == null) {
+        await notifications.cancelEndOfDayReview();
+      } else {
+        await notifications.scheduleEndOfDayReview(scheduledAt: reviewAt);
+      }
+    } catch (_) {
+      // Daily review is optional and must not interrupt offline task work.
     }
   }
 

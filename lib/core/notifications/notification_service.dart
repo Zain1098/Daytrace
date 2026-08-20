@@ -8,6 +8,7 @@ final NotificationService dayTraceNotificationService = NotificationService();
 
 class NotificationService {
   static const int smartPromptNotificationId = 900002;
+  static const int endOfDayReviewNotificationId = 900003;
 
   NotificationService({FlutterLocalNotificationsPlugin? plugin})
       : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
@@ -44,6 +45,10 @@ class NotificationService {
     if (actionId == null || actionId.isEmpty) return;
     if (payload == 'smart_prompt') {
       _emitAction(NotificationAction.smartPrompt(actionId: actionId));
+      return;
+    }
+    if (payload == 'end_of_day_review') {
+      _emitAction(NotificationAction.endOfDayReview(actionId: actionId));
       return;
     }
     if (payload == null || !payload.startsWith('reminder:')) return;
@@ -167,6 +172,36 @@ class NotificationService {
 
   Future<void> cancelSmartPrompt() => cancel(smartPromptNotificationId);
 
+  Future<void> scheduleEndOfDayReview({required DateTime scheduledAt}) async {
+    await initialize();
+    await _plugin.zonedSchedule(
+      id: endOfDayReviewNotificationId,
+      title: 'Review your day',
+      body: 'See your tracked time, activities, and today\'s summary.',
+      scheduledDate: tz.TZDateTime.from(scheduledAt.toUtc(), tz.UTC),
+      notificationDetails: const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'end_of_day_review',
+          'End-of-day review',
+          channelDescription: 'A helpful prompt to review your DayTrace report',
+          importance: Importance.defaultImportance,
+          priority: Priority.defaultPriority,
+          actions: <AndroidNotificationAction>[
+            AndroidNotificationAction(
+              'review',
+              'Open report',
+              showsUserInterface: true,
+            ),
+          ],
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      payload: 'end_of_day_review',
+    );
+  }
+
+  Future<void> cancelEndOfDayReview() => cancel(endOfDayReviewNotificationId);
+
   Future<void> showUpdateAvailable({required String version}) async {
     await initialize();
     await _plugin.show(
@@ -181,7 +216,7 @@ class NotificationService {
   }
 }
 
-enum NotificationActionKind { reminder, smartPrompt }
+enum NotificationActionKind { reminder, smartPrompt, endOfDayReview }
 
 class NotificationAction {
   const NotificationAction.reminder({
@@ -192,6 +227,11 @@ class NotificationAction {
 
   const NotificationAction.smartPrompt({required this.actionId})
     : kind = NotificationActionKind.smartPrompt,
+      reminderId = null,
+      taskId = null;
+
+  const NotificationAction.endOfDayReview({required this.actionId})
+    : kind = NotificationActionKind.endOfDayReview,
       reminderId = null,
       taskId = null;
 

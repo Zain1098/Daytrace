@@ -35,6 +35,18 @@ class TodayScreen extends ConsumerWidget {
       },
       fireImmediately: true,
     );
+    ref.listen<int>(
+      endOfDayReviewRequestProvider,
+      (int? previous, int next) {
+        if (next > 0 && next != previous) {
+          ref.read(endOfDayReviewRequestProvider.notifier).consume();
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (context.mounted) context.go('/reports');
+          });
+        }
+      },
+      fireImmediately: true,
+    );
     ref.listen<AsyncValue<int>>(widgetQuickAddProvider, (
       AsyncValue<int>? previous,
       AsyncValue<int> next,
