@@ -55,6 +55,23 @@ class SettingsRepository {
       <Object?>[jsonEncode(value), DateTime.now().toUtc().millisecondsSinceEpoch],
     );
   }
+
+  Future<bool> isOnboardingComplete() async {
+    await _database.initialize();
+    final List<Map<String, Object?>> rows = await _database.select(
+      "SELECT value_json FROM app_settings WHERE key = 'onboarding_complete'",
+    );
+    if (rows.isEmpty) return false;
+    return jsonDecode(rows.single['value_json']! as String) as bool? ?? false;
+  }
+
+  Future<void> setOnboardingComplete(bool complete) async {
+    await _database.initialize();
+    await _database.insert(
+      "INSERT OR REPLACE INTO app_settings (key, value_json, updated_at) VALUES ('onboarding_complete', ?, ?)",
+      <Object?>[jsonEncode(complete), DateTime.now().toUtc().millisecondsSinceEpoch],
+    );
+  }
 }
 
 class TrackingSettings {

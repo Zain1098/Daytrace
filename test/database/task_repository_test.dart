@@ -509,4 +509,12 @@ void main() {
     expect(weekly.trackedMinutes, 210);
     expect(weekly.localSummary, contains('Tracked time: 3h 30m'));
   });
+
+  test('onboarding completion is persisted locally', () async {
+    final SettingsRepository settings = SettingsRepository(database);
+
+    expect(await settings.isOnboardingComplete(), isFalse);
+    await settings.setOnboardingComplete(true);
+    expect(await settings.isOnboardingComplete(), isTrue);
+  });
 }
